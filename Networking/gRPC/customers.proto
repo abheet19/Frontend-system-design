@@ -1,0 +1,68 @@
+// ============================================================================
+// customers.proto — THE CONTRACT
+// ----------------------------------------------------------------------------
+// This single file is the "source of truth" shared by BOTH the gRPC server and
+// the gRPC client. In REST you write the API spec in docs/Swagger and hope both
+// sides agree; in gRPC the .proto file IS the API, and code is generated/loaded
+// from it so the two sides can never drift. This is called "contract-first".
+//
+// At runtime, @grpc/proto-loader reads this file and builds JS objects from it
+// (see client.js / server/index.js). Protobuf then serializes messages to a
+// compact BINARY format over HTTP/2 (not human-readable JSON like REST).
+// ============================================================================
+
+// Which version of the Protocol Buffers language this file uses.
+// proto3 is the modern default. KEY proto3 RULE: every field is "optional" and
+// scalar fields (string/int/bool...) default to their ZERO value ("" / 0 / false)
+// when not set — there is no "required" and no true null for scalars.
+syntax = "proto3";
+
+// Namespace for the generated types. In client.js we reach the service via
+// `grpc.loadPackageDefinition(...).customers` — that ".customers" comes from here.
+package customers;
+
+// ----------------------------------------------------------------------------
+// SERVICE = the set of remote functions the server exposes.
+// Each `rpc` is ONE callable method. The client calls these as if they were
+// local functions (client.get(...)) — gRPC hides the network entirely.
+// Shape:  rpc MethodName (RequestMessage) returns (ResponseMessage) {}
+// This demo uses only "unary" calls (one request -> one response). gRPC also
+// supports streaming (add the `stream` keyword), which REST cannot do natively.
+// ----------------------------------------------------------------------------
+service CustomerService {
+  rpc GetAll(Empty) returns (CustomerList) {}          // list every customer
+  rpc Get(CustomerRequestID) returns (Customer) {}     // one customer by id -> returns a Customer DIRECTLY
+  rpc Insert(Customer) returns (Customer) {}           // create -> returns the created Customer
+  rpc Update(Customer) returns (Customer) {}           // full replace -> returns the updated Customer
+  rpc Delete(CustomerRequestID) returns (Empty) {}     // delete -> returns nothing (Empty)
+}
+
+// ----------------------------------------------------------------------------
+// MESSAGES = the typed data structures (like TS interfaces / DTOs).
+// The `= 1`, `= 2` are FIELD NUMBERS (tags). They — not the field names — are
+// what actually goes on the wire in the binary encoding, so they must stay
+// stable forever once in use. Never reuse or renumber a tag.
+// ----------------------------------------------------------------------------
+
+// A message with no fields — gRPC's idiomatic "void" for requests/responses
+// that carry no data (like GetAll's input and Delete's output).
+message Empty {}
+
+// Request payload that carries just an id (used by Get and Delete).
+message CustomerRequestID {
+  string id = 1;
+}
+
+// A list wrapper. `repeated` = an array/list of the given type (0..N items).
+// So the wire has a field named "customers" holding many Customer values.
+message CustomerList {
+  repeated Customer customers = 1;
+}
+
+// The core entity.
+message Customer {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  string phone = 4;
+}

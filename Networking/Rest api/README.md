@@ -28,12 +28,12 @@ The server runs on `http://localhost:3000`.
 
 ## Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/` | Health check |
-| GET | `/todos` | Get all todos |
-| POST | `/todos` | Create a new todo |
-| PUT | `/todos/:id` | Update a todo by ID |
+| Method | Endpoint     | Description         |
+| ------ | ------------ | ------------------- |
+| GET    | `/`          | Health check        |
+| GET    | `/todos`     | Get all todos       |
+| POST   | `/todos`     | Create a new todo   |
+| PUT    | `/todos/:id` | Update a todo by ID |
 | DELETE | `/todos/:id` | Delete a todo by ID |
 
 ## Example Requests

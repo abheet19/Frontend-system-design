@@ -45,4 +45,4 @@ export const typeDefs = `#graphql
         addAuthor(name: String!): Author!                                    # create a new author
         addBook(title: String!, publishedYear: Int!, authorId: ID!): Book!   # create a new book linked to an author
     }
-`
+`;
