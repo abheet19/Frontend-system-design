@@ -4,7 +4,9 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "nodemon index.js",
+    "start": "tsx watch index.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -12,7 +14,11 @@
   "description": "",
   "dependencies": {
     "@apollo/server": "^5.5.1",
-    "graphql": "^16.14.2",
-    "nodemon": "^3.1.14"
+    "graphql": "^16.14.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
   }
 }

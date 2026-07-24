@@ -10,7 +10,7 @@
     "format:check": "prettier --check \"**/*.{js,json,css,md}\""
   },
   "lint-staged": {
-    "*.js": [
+    "*.{js,ts}": [
       "eslint --fix",
       "prettier --write"
     ],
@@ -27,6 +27,7 @@
     "eslint": "^9.39.4",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "prettier": "^3.4.2"
+    "prettier": "^3.4.2",
+    "typescript-eslint": "^8.65.0"
   }
 }

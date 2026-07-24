@@ -11,13 +11,23 @@ import grpc from '@grpc/grpc-js'; // pure-JS gRPC runtime (server + client + sta
 import protoLoader from '@grpc/proto-loader'; // reads a .proto file into a JS package definition
 import path from 'path'; // build a filesystem path to the .proto in an OS-safe way
 import { randomUUID } from 'crypto'; // Node's built-in UUID generator (node:crypto), for new ids
+// NEW SYNTAX (TS): `import type { ... }` — types-only import from our own
+// types.ts. NodeNext ESM requires the `.js` specifier extension even though
+// the source file on disk is types.ts; TS rewrites this to point at the
+// compiled output, this is normal/required, not a typo.
+import type {
+  Customer,
+  CustomerRequestID,
+  CustomerList,
+  Empty,
+} from '../types.js';
 
 // --- in-memory data store ----------------------------------------------------
 // Declared FIRST so it exists before any handler closure below can run. (Your
 // original had this at the bottom; it worked only because the whole module
 // finishes evaluating before the first request arrives — but top is correct.)
 // In production this would be a real database (Postgres, Mongo, ...).
-const customers = [
+const customers: Customer[] = [
   {
     id: '1',
     name: 'John Doe',
@@ -55,7 +65,19 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 
 // Build usable gRPC objects from that definition, then drill into the
 // `customers` package (from `package customers;` in the .proto).
-const customersProto = grpc.loadPackageDefinition(packageDefinition).customers;
+// NEW SYNTAX (TS): `grpc.loadPackageDefinition(...)` is typed to return a
+// `GrpcObject`, whose values are `GrpcObject | ServiceClientConstructor |
+// ProtobufTypeDefinition` — proto-loader builds this shape dynamically at
+// runtime from whatever .proto you give it, so TS can't know in advance that
+// `.customers` is a namespace (GrpcObject) or that `.CustomerService` inside
+// it is a service constructor. These two casts are the one intentionally-loose
+// boundary in this file: they tell TS what we (as the humans who wrote
+// customers.proto) know to be true, and everything past this point is fully
+// typed again.
+const customersProto = grpc.loadPackageDefinition(packageDefinition)
+  .customers as grpc.GrpcObject;
+const CustomerService =
+  customersProto.CustomerService as grpc.ServiceClientConstructor;
 
 // --- helper: wrap a handler so any thrown error becomes a clean gRPC error ---
 // gRPC unary handler signature is:  (call, callback) => { ... }
@@ -65,14 +87,31 @@ const customersProto = grpc.loadPackageDefinition(packageDefinition).customers;
 //               failure => callback({ code: grpc.status.X, message: '...' })
 // This wrapper adds a try/catch so an unexpected bug returns INTERNAL instead
 // of crashing the whole server (an uncaught throw in a handler is fatal).
-const handler = (fn) => (call, callback) => {
-  try {
-    fn(call, callback);
-  } catch (err) {
-    console.error('Handler error:', err);
-    callback({ code: grpc.status.INTERNAL, message: 'Internal server error' });
-  }
-};
+// NEW SYNTAX (TS): `handler` is now GENERIC over <RequestType, ResponseType>
+// so it can wrap any of the five call/callback shapes below (Empty, Customer,
+// CustomerRequestID, CustomerList) while still giving each handler body
+// precise types for `call.request` and `callback`.
+function handler<RequestType, ResponseType>(
+  fn: (
+    call: grpc.ServerUnaryCall<RequestType, ResponseType>,
+    callback: grpc.sendUnaryData<ResponseType>
+  ) => void
+) {
+  return (
+    call: grpc.ServerUnaryCall<RequestType, ResponseType>,
+    callback: grpc.sendUnaryData<ResponseType>
+  ) => {
+    try {
+      fn(call, callback);
+    } catch (err) {
+      console.error('Handler error:', err);
+      callback({
+        code: grpc.status.INTERNAL,
+        message: 'Internal server error',
+      });
+    }
+  };
+}
 
 // --- create the server and register the service implementation ---------------
 const server = new grpc.Server();
@@ -80,11 +119,11 @@ const server = new grpc.Server();
 // addService links the .proto service (CustomerService) to real JS functions.
 // The keys here (getAll/get/insert/update/delete) map to the rpc names — with
 // keepCase they match the proto casing (rpc GetAll -> getAll on the JS object).
-server.addService(customersProto.CustomerService.service, {
+server.addService(CustomerService.service, {
   // GetAll -> returns CustomerList { repeated Customer customers }
   // So the response object's shape must be { customers: [...] }. This one was
   // already correct because CustomerList genuinely HAS a `customers` field.
-  getAll: handler((call, callback) => {
+  getAll: handler<Empty, CustomerList>((call, callback) => {
     callback(null, { customers });
   }),
 
@@ -94,7 +133,7 @@ server.addService(customersProto.CustomerService.service, {
   // gateway received an empty Customer — that was your "success:true but no
   // data" bug. Also note the `return` on the not-found path: without it the code
   // fell through and called callback() a SECOND time (a double-callback bug).
-  get: handler((call, callback) => {
+  get: handler<CustomerRequestID, Customer>((call, callback) => {
     const customer = customers.find((c) => c.id === call.request.id);
     if (!customer) {
       return callback({
@@ -107,7 +146,7 @@ server.addService(customersProto.CustomerService.service, {
 
   // Insert -> create a new customer. Validate first, then assign a server-side
   // id (never trust the client to pick ids). Returns the created Customer.
-  insert: handler((call, callback) => {
+  insert: handler<Customer, Customer>((call, callback) => {
     const { name, email, phone } = call.request;
     if (!name || !email) {
       return callback({
@@ -115,14 +154,19 @@ server.addService(customersProto.CustomerService.service, {
         message: 'name and email are required',
       });
     }
-    const customer = { id: randomUUID(), name, email, phone: phone || '' };
+    const customer: Customer = {
+      id: randomUUID(),
+      name,
+      email,
+      phone: phone || '',
+    };
     customers.push(customer);
     callback(null, customer); // matches `returns (Customer)`
   }),
 
   // Update -> full replace (PUT semantics). Find by id, overwrite fields,
   // return the updated Customer. `return` after NOT_FOUND is required.
-  update: handler((call, callback) => {
+  update: handler<Customer, Customer>((call, callback) => {
     const customer = customers.find((c) => c.id === call.request.id);
     if (!customer) {
       return callback({
@@ -144,7 +188,7 @@ server.addService(customersProto.CustomerService.service, {
   // { message: 'deleted' } here, protobuf would drop it — the gateway can't
   // receive data through an Empty response. The "deleted" message is added by
   // the REST gateway instead (see client/index.js).
-  delete: handler((call, callback) => {
+  delete: handler<CustomerRequestID, Empty>((call, callback) => {
     const index = customers.findIndex((c) => c.id === call.request.id);
     if (index === -1) {
       return callback({

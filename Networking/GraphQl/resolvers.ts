@@ -3,6 +3,7 @@
 // the schema: { TypeName: { fieldName: resolverFn } }.
 
 import { GraphQLError } from 'graphql'; // for throwing typed GraphQL errors
+import type { Author, Book, AddAuthorArgs, AddBookArgs } from './entities.js';
 
 // ----------------------------
 // IN-MEMORY DATA STORE
@@ -12,7 +13,7 @@ import { GraphQLError } from 'graphql'; // for throwing typed GraphQL errors
 // points at its author via `authorId`. (An author does NOT store bookIds; that
 // would be a second, duplicate source of truth that can drift. Author.books is
 // derived by filtering the books list — see the Author resolver below.)
-const data = {
+const data: { authors: Author[]; books: Book[] } = {
   authors: [
     { id: '1', name: 'John Doe' },
     { id: '2', name: 'Jane Smith' },
@@ -50,21 +51,22 @@ export const resolvers = {
   Book: {
     // parent = one Book. Find its author. Ids are consistent strings, so we can
     // use STRICT === (no loose == coercion needed).
-    author: (parent) =>
+    author: (parent: Book): Author | undefined =>
       data.authors.find((author) => author.id === parent.authorId),
   },
 
   Author: {
     // parent = one Author. Its books are every book pointing back at this id.
-    books: (parent) => data.books.filter((book) => book.authorId === parent.id),
+    books: (parent: Author): Book[] =>
+      data.books.filter((book) => book.authorId === parent.id),
   },
 
   // ----------------------------
   // QUERY RESOLVERS (READ) — the entry points; parent is undefined here.
   // ----------------------------
   Query: {
-    authors: () => data.authors, // in prod: await db.authors.findAll()
-    books: () => data.books, // in prod: await db.books.findAll()
+    authors: (): Author[] => data.authors, // in prod: await db.authors.findAll()
+    books: (): Book[] => data.books, // in prod: await db.books.findAll()
   },
 
   // ----------------------------
@@ -75,7 +77,7 @@ export const resolvers = {
   //   variables: { "name": "Abheet" }
   Mutation: {
     // `_` is a throwaway for the unused `parent`; `args` = { name }.
-    addAuthor: (_, args) => {
+    addAuthor: (_: unknown, args: AddAuthorArgs): Author => {
       const name = args.name?.trim();
       if (!name) {
         // Throwing a GraphQLError is how you surface a clean, typed error to the
@@ -84,13 +86,13 @@ export const resolvers = {
           extensions: { code: 'BAD_USER_INPUT' },
         });
       }
-      const newAuthor = { id: String(nextAuthorId++), name };
+      const newAuthor: Author = { id: String(nextAuthorId++), name };
       data.authors.push(newAuthor);
       return newAuthor; // must satisfy `Author!` from the schema
     },
 
     // args = { title, publishedYear, authorId }
-    addBook: (_, args) => {
+    addBook: (_: unknown, args: AddBookArgs): Book => {
       // Validate the relationship BEFORE creating — reject a book that points at
       // a non-existent author instead of silently storing a dangling link.
       const author = data.authors.find((a) => a.id === args.authorId);
@@ -99,7 +101,7 @@ export const resolvers = {
           extensions: { code: 'BAD_USER_INPUT' },
         });
       }
-      const newBook = { ...args, id: String(nextBookId++) };
+      const newBook: Book = { ...args, id: String(nextBookId++) };
       data.books.push(newBook);
       return newBook; // must satisfy `Book!` from the schema
     },

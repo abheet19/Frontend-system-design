@@ -91,3 +91,14 @@ mutation {
 curl localhost:4000 -H 'Content-Type: application/json' \
   -d '{"query":"{ authors { name books { title } } }"}'
 ```
+
+## Now in TypeScript
+
+Converted `types.js`/`resolvers.js`/`index.js` to `.ts`; `npm run typecheck` (`tsc
+--noEmit`) now enforces types on every save. `npm run start` runs via `tsx watch
+index.ts` — no separate build step needed for dev (`npm run build` exists for a
+compiled `dist/` output). New: `entities.ts` hand-writes `Author`/`Book`/
+`AddAuthorArgs`/`AddBookArgs` (deliberately separate from `types.ts`, which
+still owns the SDL schema string) and the resolvers/index files are typed
+against them — e.g. `Book.author` returns `Author | undefined`, `Mutation.addAuthor`
+takes `AddAuthorArgs` and returns `Author`.

@@ -1,4 +1,15 @@
 const js = require('@eslint/js');
+const tseslint = require('typescript-eslint');
+
+// Style rules shared by BOTH .js and .ts files, so Prettier and ESLint never
+// disagree regardless of which extension a file has.
+const styleRules = {
+  indent: ['error', 2, { SwitchCase: 1 }],
+  'linebreak-style': ['error', 'unix'],
+  quotes: ['error', 'single', { avoidEscape: true }],
+  semi: ['error', 'always'],
+  'no-console': ['warn'],
+};
 
 module.exports = [
   {
@@ -25,17 +36,35 @@ module.exports = [
     },
     rules: {
       ...js.configs.recommended.rules,
-      // SwitchCase: 1 keeps ESLint's indent rule in agreement with Prettier,
-      // which indents `case` clauses one level inside `switch`. Without it the
-      // two tools fight over any switch statement.
-      indent: ['error', 2, { SwitchCase: 1 }],
-      'linebreak-style': ['error', 'unix'],
-      quotes: ['error', 'single', { avoidEscape: true }],
-      semi: ['error', 'always'],
+      ...styleRules,
       'no-unused-vars': ['warn'],
-      'no-console': ['warn'],
       'no-var': ['error'],
       'prefer-const': ['error'],
+    },
+  },
+  // TypeScript files: typescript-eslint's recommended rules (type-aware
+  // unused-vars, no-explicit-any warnings, etc.) plus the SAME style rules as
+  // the .js block above, so formatting is identical across the whole repo.
+  ...tseslint.configs.recommended.map((config) => ({
+    ...config,
+    files: ['**/*.ts'],
+  })),
+  {
+    files: ['**/*.ts'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+      },
+    },
+    rules: {
+      ...styleRules,
+      // TS's own unused-vars replaces the base JS rule (understands types,
+      // and lets us prefix intentionally-unused params with `_`).
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_' },
+      ],
     },
   },
 ];

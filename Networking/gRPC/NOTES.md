@@ -96,3 +96,17 @@ curl -X PUT  localhost:3000/update/2 -H 'Content-Type: application/json' \
      -d '{"name":"Jane 2","email":"j@x.com","phone":"9"}'
 curl -X DELETE localhost:3000/delete/3
 ```
+
+## Now in TypeScript
+
+`server/index.js`, `client/client.js`, and `client/index.js` are now `.ts`
+(old `.js` files kept alongside for now). `npm run typecheck` (`tsc --noEmit`)
+enforces the types; `npm run server` / `npm run client` run the `.ts` files
+directly via `tsx` — no separate build step needed for dev (`npm run build`
+exists for a real compiled `dist/` output). New: `types.ts` mirrors
+`customers.proto`'s messages (`Customer`, `CustomerRequestID`, `CustomerList`,
+`Empty`); the server's `handler` wrapper and every RPC method are typed via
+`@grpc/grpc-js`'s `ServerUnaryCall`/`sendUnaryData` generics; `client.ts`
+exports a hand-written `CustomerServiceClient` interface for the proto-loader
+stub (the one loosely-typed boundary, cast via `unknown`); the REST gateway
+types every route with Express's `Request`/`Response`.

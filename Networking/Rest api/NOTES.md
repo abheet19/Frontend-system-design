@@ -62,3 +62,13 @@ curl -X DELETE localhost:3000/todos/1
 ```
 
 > ⚠️ Port `3000` is shared with the gRPC gateway — run only one of them at a time.
+
+## Now in TypeScript
+
+`index.js` → `index.ts`. `npm run typecheck` (`tsc --noEmit`) now enforces
+types on every commit-worthy change. `npm run start` runs `tsx watch index.ts`
+directly — no separate build step needed for dev (nodemon is gone, tsx's
+watch mode replaces its job). Types added: a `Todo` interface for the
+in-memory store, `Request`/`Response`/`NextFunction` on every route handler,
+and a narrowed `unknown` → `{ status?: number }` cast in the error handler
+(replacing the implicit `any` on `err`).

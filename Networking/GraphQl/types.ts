@@ -3,7 +3,7 @@
 // Written in SDL (Schema Definition Language) inside a tagged template literal
 // The #graphql comment enables syntax highlighting in editors
 
-export const typeDefs = `#graphql
+export const typeDefs: string = `#graphql
 
     # ----------------------------
     # OBJECT TYPES
